@@ -182,48 +182,103 @@ class FoxgloveStudioCharm(CharmBase):
 
     @property
     def _ingress_config(self) -> dict:
+        # """Build a raw ingress configuration for Traefik."""
+        # fqdn = urlparse(socket.getfqdn()).path
+        # pattern = r"^{}\..*?{}\.".format(self.model.unit.name.replace("/", "-"), self.model.name)
+        # domain = re.split(pattern, fqdn)[1]
+
+        # if self.external_url == self.ingress.external_host:
+        #     external_path = "{}-{}".format(self.model.name, self.model.app.name)
+        # else:
+        #     external_path = urlparse(self.external_url).path or "{}-{}".format(
+        #         self.model.name, self.model.app.name
+        #     )
+
+        # if not external_path.startswith("/"):
+        #     external_path = "/{}".format(external_path)
+
+        # routers = {
+        #     "juju-{}-{}-router".format(self.model.name, self.model.app.name): {
+        #         "entryPoints": ["web"],
+        #         "rule": "PathPrefix(`{}`)".format(external_path),
+        #         "service": "juju-{}-{}-service".format(self.model.name, self.app.name),
+        #     }
+        # }
+
+        # services = {
+        #     "juju-{}-{}-service".format(self.model.name, self.model.app.name): {
+        #         "loadBalancer": {
+        #             "servers": [
+        #                 {
+        #                     "url": "http://{}.{}-endpoints.{}.{}:{}/".format(
+        #                         self.model.unit.name.replace("/", "-"),
+        #                         self.model.app.name,
+        #                         self.model.name,
+        #                         domain,
+        #                         8080,
+        #                     )
+        #                 }
+        #             ]
+        #         }
+        #     }
+        # }
+
+        # return {"http": {"routers": routers, "services": services}}
         """Build a raw ingress configuration for Traefik."""
-        fqdn = urlparse(socket.getfqdn()).path
-        pattern = r"^{}\..*?{}\.".format(self.model.unit.name.replace("/", "-"), self.model.name)
-        domain = re.split(pattern, fqdn)[1]
+        # The path prefix is the same as in ingress per app
+        external_path = f"{self.model.name}-{self.model.app.name}"
 
-        if self.external_url == self.ingress.external_host:
-            external_path = "{}-{}".format(self.model.name, self.model.app.name)
-        else:
-            external_path = urlparse(self.external_url).path or "{}-{}".format(
-                self.model.name, self.model.app.name
-            )
+        redirect_middleware = (
+            {
+                f"juju-sidecar-redir-https-{self.model.name}-{self.model.app.name}": {
+                    "redirectScheme": {
+                        "permanent": True,
+                        "port": 443,
+                        "scheme": "https",
+                    }
+                }
+            }
+            if self._scheme == "https"
+            else {}
+        )
 
-        if not external_path.startswith("/"):
-            external_path = "/{}".format(external_path)
+        middlewares = {
+            f"juju-sidecar-noprefix-{self.model.name}-{self.model.app.name}": {
+                "stripPrefix": {"forceSlash": False, "prefixes": [f"/{external_path}"]},
+            },
+            **redirect_middleware,
+        }
 
         routers = {
             "juju-{}-{}-router".format(self.model.name, self.model.app.name): {
                 "entryPoints": ["web"],
-                "rule": "PathPrefix(`{}`)".format(external_path),
+                "rule": f"PathPrefix(`/{external_path}`)",
+                "middlewares": list(middlewares.keys()),
                 "service": "juju-{}-{}-service".format(self.model.name, self.app.name),
-            }
+            },
+            "juju-{}-{}-router-tls".format(self.model.name, self.model.app.name): {
+                "entryPoints": ["websecure"],
+                "rule": f"PathPrefix(`/{external_path}`)",
+                "middlewares": list(middlewares.keys()),
+                "service": "juju-{}-{}-service".format(self.model.name, self.app.name),
+                "tls": {
+                    "domains": [
+                        {
+                            "main": self.ingress.external_host,
+                            "sans": [f"*.{self.ingress.external_host}"],
+                        },
+                    ],
+                },
+            },
         }
 
         services = {
             "juju-{}-{}-service".format(self.model.name, self.model.app.name): {
-                "loadBalancer": {
-                    "servers": [
-                        {
-                            "url": "http://{}.{}-endpoints.{}.{}:{}/".format(
-                                self.model.unit.name.replace("/", "-"),
-                                self.model.app.name,
-                                self.model.name,
-                                domain,
-                                8080,
-                            )
-                        }
-                    ]
-                }
+                "loadBalancer": {"servers": [{"url": self.internal_url}]}
             }
         }
 
-        return {"http": {"routers": routers, "services": services}}
+        return {"http": {"routers": routers, "services": services, "middlewares": middlewares}}
 
     @property
     def _pebble_layer(self):
