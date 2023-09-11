@@ -1,0 +1,27 @@
+name: foxglove-studio
+assumes:
+  - juju >= 3.1
+  - k8s-api
+summary: |
+  Robotics data visualization and observability with Foxglove studio
+
+description: |
+  Foxglove Studio is an integrated visualization and diagnosis tool for robotics.
+
+
+containers:
+  foxglove-studio:
+    resource: foxglove-studio-image
+
+resources:
+  foxglove-studio-image:
+    type: oci-image
+    description: upstream docker image for Foxglove studio
+    upstream-source: ghcr.io/foxglove/studio:1.68
+
+requires:
+  ingress:
+    interface: traefik_route
+    limit: 1
+  catalogue:
+    interface: catalogue

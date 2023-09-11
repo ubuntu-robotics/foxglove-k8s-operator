@@ -1,0 +1,5 @@
+options:
+  server-port:
+    default: 8080
+    description: Default port on which FastAPI is available
+    type: int
