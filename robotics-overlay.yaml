@@ -1,0 +1,14 @@
+---
+applications:
+  foxglove-studio:
+    charm: ./foxglove-studio_ubuntu-22.04-amd64.charm
+    series: jammy
+    resources:
+      foxglove-studio-image: ghcr.io/foxglove/studio:1.68
+    scale: 1
+    options:
+      server-port: 8080
+    constraints: arch=amd64
+relations:
+  - [foxglove-studio:ingress, traefik:traefik-route]
+  - [foxglove-studio:catalogue, catalogue:catalogue]

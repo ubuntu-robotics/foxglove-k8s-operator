@@ -18,30 +18,20 @@
 """A Kubernetes charm for Foxglove Studio."""
 
 from ops.charm import (
-    ActionEvent,
     CharmBase,
-    ConfigChangedEvent,
     HookEvent,
-    RelationBrokenEvent,
-    RelationChangedEvent,
     RelationJoinedEvent,
-    UpgradeCharmEvent,
 )
+
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, OpenedPort, WaitingStatus
 from ops.pebble import (
-    APIError,
-    ConnectionError,
-    ExecError,
-    Layer,
-    PathError,
-    ProtocolError,
+    Layer
 )
+
 import logging
 from charms.traefik_route_k8s.v0.traefik_route import TraefikRouteRequirer
 from charms.catalogue_k8s.v0.catalogue import CatalogueConsumer, CatalogueItem
-import re
-from urllib.parse import ParseResult, urlparse
 import socket
 
 logger = logging.getLogger()
@@ -91,6 +81,7 @@ class FoxgloveStudioCharm(CharmBase):
         self.set_ports()
 
     def _on_config_changed(self, event):
+        self.set_ports()
         port = self.config["server-port"]  # see config.yaml
 
         if int(port) == 22:
@@ -141,6 +132,7 @@ class FoxgloveStudioCharm(CharmBase):
             if services != new_layer["services"]:
                 # Changes were made, add the new layer
                 self.container.add_layer("foxglove-studio", self._pebble_layer, combine=True)
+
                 logger.info("Added updated layer 'foxglove-studio' to Pebble plan")
 
                 self.container.restart(self.name)
@@ -151,7 +143,7 @@ class FoxgloveStudioCharm(CharmBase):
     
     def set_ports(self):
         """Open necessary (and close no longer needed) workload ports."""
-        planned_ports = {OpenedPort("tcp", 8080)} if self.unit.is_leader() else set()
+        planned_ports = {OpenedPort("tcp", self.config['server-port'])} if self.unit.is_leader() else set()
         actual_ports = self.unit.opened_ports()
 
         # Ports may change across an upgrade, so need to sync
@@ -170,7 +162,7 @@ class FoxgloveStudioCharm(CharmBase):
     @property
     def internal_url(self) -> str:
         """Return workload's internal URL. Used for ingress."""
-        return f"{self._scheme}://{socket.getfqdn()}:{8080}"
+        return f"{self._scheme}://{socket.getfqdn()}:{self.config['server-port']}"
 
     @property
     def external_url(self) -> str:
@@ -182,71 +174,17 @@ class FoxgloveStudioCharm(CharmBase):
 
     @property
     def _ingress_config(self) -> dict:
-        # """Build a raw ingress configuration for Traefik."""
-        # fqdn = urlparse(socket.getfqdn()).path
-        # pattern = r"^{}\..*?{}\.".format(self.model.unit.name.replace("/", "-"), self.model.name)
-        # domain = re.split(pattern, fqdn)[1]
-
-        # if self.external_url == self.ingress.external_host:
-        #     external_path = "{}-{}".format(self.model.name, self.model.app.name)
-        # else:
-        #     external_path = urlparse(self.external_url).path or "{}-{}".format(
-        #         self.model.name, self.model.app.name
-        #     )
-
-        # if not external_path.startswith("/"):
-        #     external_path = "/{}".format(external_path)
-
-        # routers = {
-        #     "juju-{}-{}-router".format(self.model.name, self.model.app.name): {
-        #         "entryPoints": ["web"],
-        #         "rule": "PathPrefix(`{}`)".format(external_path),
-        #         "service": "juju-{}-{}-service".format(self.model.name, self.app.name),
-        #     }
-        # }
-
-        # services = {
-        #     "juju-{}-{}-service".format(self.model.name, self.model.app.name): {
-        #         "loadBalancer": {
-        #             "servers": [
-        #                 {
-        #                     "url": "http://{}.{}-endpoints.{}.{}:{}/".format(
-        #                         self.model.unit.name.replace("/", "-"),
-        #                         self.model.app.name,
-        #                         self.model.name,
-        #                         domain,
-        #                         8080,
-        #                     )
-        #                 }
-        #             ]
-        #         }
-        #     }
-        # }
-
-        # return {"http": {"routers": routers, "services": services}}
         """Build a raw ingress configuration for Traefik."""
         # The path prefix is the same as in ingress per app
         external_path = f"{self.model.name}-{self.model.app.name}"
 
-        redirect_middleware = (
-            {
-                f"juju-sidecar-redir-https-{self.model.name}-{self.model.app.name}": {
-                    "redirectScheme": {
-                        "permanent": True,
-                        "port": 443,
-                        "scheme": "https",
-                    }
-                }
-            }
-            if self._scheme == "https"
-            else {}
-        )
-
         middlewares = {
+            f"juju-sidecar-trailing-slash-handler-{self.model.name}-{self.model.app.name}": {
+                "redirectRegex": {"regex": [f"^(.*)\\/{external_path}$"], "replacement": [f"/{external_path}"], "permanent": True}
+            },
             f"juju-sidecar-noprefix-{self.model.name}-{self.model.app.name}": {
                 "stripPrefix": {"forceSlash": False, "prefixes": [f"/{external_path}"]},
-            },
-            **redirect_middleware,
+            }
         }
 
         routers = {
