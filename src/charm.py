@@ -25,9 +25,7 @@ from ops.charm import (
 
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, OpenedPort, WaitingStatus
-from ops.pebble import (
-    Layer
-)
+from ops.pebble import Layer
 
 import logging
 from charms.traefik_route_k8s.v0.traefik_route import TraefikRouteRequirer
@@ -36,6 +34,7 @@ import socket
 
 logger = logging.getLogger()
 
+
 class FoxgloveStudioCharm(CharmBase):
     """Charm to run Foxglove studio on Kubernetes."""
 
@@ -43,10 +42,10 @@ class FoxgloveStudioCharm(CharmBase):
         super().__init__(*args)
         self.name = "foxglove-studio"
 
-        self.container = self.unit.get_container(self.name) 
+        self.container = self.unit.get_container(self.name)
 
         # -- ingress via raw traefik_route
-        self.ingress = TraefikRouteRequirer(self, self.model.get_relation("ingress"), "ingress")
+        self.ingress = TraefikRouteRequirer(self, self.model.get_relation("ingress"), "ingress")  # type: ignore
         self.framework.observe(self.on["ingress"].relation_joined, self._configure_ingress)
         self.framework.observe(self.ingress.on.ready, self._on_ingress_ready)
         self.framework.observe(self.on.leader_elected, self._configure_ingress)
@@ -70,9 +69,7 @@ class FoxgloveStudioCharm(CharmBase):
                 name="Foxglove-studio",
                 icon="bar-chart",
                 url=self.external_url,
-                description=(
-                    "Foxglove-studio allows you to robotics data"
-                ),
+                description=("Foxglove-studio allows you to robotics data"),
             ),
         )
 
@@ -96,8 +93,7 @@ class FoxgloveStudioCharm(CharmBase):
         self._update_layer_and_restart(None)
 
     def _configure_ingress(self, event: HookEvent) -> None:
-        """Set up ingress if a relation is joined, config changed, or a new leader election.
-        """
+        """Set up ingress if a relation is joined, config changed, or a new leader election."""
         if not self.unit.is_leader():
             return
 
@@ -113,23 +109,16 @@ class FoxgloveStudioCharm(CharmBase):
             self.ingress.submit_to_traefik(self._ingress_config)
 
     def _update_layer_and_restart(self, event) -> None:
-        """Define and start a workload using the Pebble API.
-
-        You'll need to specify the right entrypoint and environment
-        configuration for your specific workload. Tip: you can see the
-        standard entrypoint of an existing container using docker inspect
-
-        Learn more about Pebble layers at https://github.com/canonical/pebble
-        """
-
+        """Define and start a workload using the Pebble API."""
         # Learn more about statuses in the SDK docs:
         # https://juju.is/docs/sdk/constructs#heading--statuses
+
         self.unit.status = MaintenanceStatus("Assembling pod spec")
         if self.container.can_connect():
             new_layer = self._pebble_layer.to_dict()
             # Get the current pebble layer config
             services = self.container.get_plan().to_dict().get("services", {})
-            if services != new_layer["services"]:
+            if services != new_layer["services"]:  # pyright: ignore
                 # Changes were made, add the new layer
                 self.container.add_layer("foxglove-studio", self._pebble_layer, combine=True)
 
@@ -140,10 +129,15 @@ class FoxgloveStudioCharm(CharmBase):
             self.unit.status = ActiveStatus()
         else:
             self.unit.status = WaitingStatus("Waiting for Pebble in workload container")
-    
+
     def set_ports(self):
         """Open necessary (and close no longer needed) workload ports."""
-        planned_ports = {OpenedPort("tcp", self.config['server-port'])} if self.unit.is_leader() else set()
+        planned_ports = (
+            {OpenedPort("tcp", int(self.config["server-port"]))}
+            if self.unit.is_leader()
+            else set()
+        )
+
         actual_ports = self.unit.opened_ports()
 
         # Ports may change across an upgrade, so need to sync
@@ -180,11 +174,15 @@ class FoxgloveStudioCharm(CharmBase):
 
         middlewares = {
             f"juju-sidecar-trailing-slash-handler-{self.model.name}-{self.model.app.name}": {
-                "redirectRegex": {"regex": [f"^(.*)\\/{external_path}$"], "replacement": [f"/{external_path}"], "permanent": True}
+                "redirectRegex": {
+                    "regex": [f"^(.*)\\/{external_path}$"],
+                    "replacement": [f"/{external_path}"],
+                    "permanent": True,
+                }
             },
             f"juju-sidecar-noprefix-{self.model.name}-{self.model.app.name}": {
                 "stripPrefix": {"forceSlash": False, "prefixes": [f"/{external_path}"]},
-            }
+            },
         }
 
         routers = {
@@ -230,19 +228,23 @@ class FoxgloveStudioCharm(CharmBase):
             ]
         )
 
-        pebble_layer = {
-            "summary": "Foxglove-studio k8s layer",
-            "description": "Foxglove-studio k8s layer",
-            "services": {
-                self.name: {
-                    "override": "replace",
-                    "summary": "foxglove-studio-k8s service",
-                    "command": command,
-                    "startup": "enabled"
-                }
-            },
-        }
-        return Layer(pebble_layer)
+        pebble_layer = Layer(
+            {
+                "summary": "Foxglove-studio k8s layer",
+                "description": "Foxglove-studio k8s layer",
+                "services": {
+                    self.name: {
+                        "override": "replace",
+                        "summary": "foxglove-studio-k8s service",
+                        "command": command,
+                        "startup": "enabled",
+                    }
+                },
+            }
+        )
+
+        return pebble_layer
+
 
 if __name__ == "__main__":  # pragma: nocover
     main(FoxgloveStudioCharm)
