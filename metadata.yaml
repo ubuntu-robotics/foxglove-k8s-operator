@@ -24,3 +24,8 @@ requires:
     limit: 1
   catalogue:
     interface: catalogue
+  certificates:
+    interface: tls-certificates
+    limit: 1
+    description: Certificate and key files for Foxglove-studio to use with TLS.
+

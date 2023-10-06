@@ -28,6 +28,10 @@ from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, OpenedPort
 from ops.pebble import Layer
 
 import logging
+from pathlib import Path
+import subprocess
+
+from charms.observability_libs.v0.cert_handler import CertHandler
 from charms.traefik_route_k8s.v0.traefik_route import TraefikRouteRequirer
 from charms.catalogue_k8s.v0.catalogue import CatalogueConsumer, CatalogueItem
 import socket
@@ -44,12 +48,21 @@ class FoxgloveStudioCharm(CharmBase):
 
         self.container = self.unit.get_container(self.name)
 
+        # -- cert_handler
+        self.cert_handler = CertHandler(
+            charm=self,
+            key="foxglove-studio-server-cert",
+            peer_relation_name="replicas",
+            extra_sans_dns=[socket.getfqdn()],
+        )
+
         # -- ingress via raw traefik_route
         self.ingress = TraefikRouteRequirer(self, self.model.get_relation("ingress"), "ingress")  # type: ignore
         self.framework.observe(self.on["ingress"].relation_joined, self._configure_ingress)
         self.framework.observe(self.ingress.on.ready, self._on_ingress_ready)
         self.framework.observe(self.on.leader_elected, self._configure_ingress)
         self.framework.observe(self.on.config_changed, self._configure_ingress)
+        self.framework.observe(self.cert_handler.on.cert_changed, self._configure_ingress)
 
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(
@@ -71,6 +84,11 @@ class FoxgloveStudioCharm(CharmBase):
                 url=self.external_url,
                 description=("Foxglove-studio allows you to robotics data"),
             ),
+        )
+
+        # -- cert_handler observations
+        self.framework.observe(
+            self.cert_handler.on.cert_changed, self._on_server_cert_changed  # pyright: ignore
         )
 
     def _on_install(self, _):
@@ -151,7 +169,7 @@ class FoxgloveStudioCharm(CharmBase):
 
     @property
     def _scheme(self) -> str:
-        return "http"
+        return "https" if self.cert_handler.cert else "http"
 
     @property
     def internal_url(self) -> str:
@@ -172,17 +190,32 @@ class FoxgloveStudioCharm(CharmBase):
         # The path prefix is the same as in ingress per app
         external_path = f"{self.model.name}-{self.model.app.name}"
 
+        redirect_middleware = (
+            {
+                f"juju-sidecar-redir-https-{self.model.name}-{self.model.app.name}": {
+                    "redirectScheme": {
+                        "permanent": True,
+                        "port": 443,
+                        "scheme": "https",
+                    }
+                }
+            }
+            if self._scheme == "https"
+            else {}
+        )
+
         middlewares = {
             f"juju-sidecar-trailing-slash-handler-{self.model.name}-{self.model.app.name}": {
                 "redirectRegex": {
                     "regex": [f"^(.*)\\/{external_path}$"],
-                    "replacement": [f"/{external_path}"],
+                    "replacement": [f"/{external_path}/"],
                     "permanent": True,
                 }
             },
             f"juju-sidecar-noprefix-{self.model.name}-{self.model.app.name}": {
                 "stripPrefix": {"forceSlash": False, "prefixes": [f"/{external_path}"]},
             },
+            **redirect_middleware,
         }
 
         routers = {
@@ -224,7 +257,17 @@ class FoxgloveStudioCharm(CharmBase):
                 "caddy",
                 "file-server",
                 "--listen",
+                f":{self.config['server-port']}"
+            ]
+        )
+        if self._scheme == "https":
+            command = " ".join(
+            [
+                "caddy",
+                "file-server",
+                "--listen",
                 f":{self.config['server-port']}",
+                "-key /etc/caddy/foxglove.key -cert /etc/caddy/foxglove.crt",
             ]
         )
 
@@ -245,6 +288,41 @@ class FoxgloveStudioCharm(CharmBase):
 
         return pebble_layer
 
+    def _on_server_cert_changed(self, _):
+        self._update_cert()
+        self._update_layer_and_restart()
+
+    def _update_cert(self):
+        container = self.containers["workload"]
+        ca_cert_path = Path("/usr/local/share/ca-certificates/cos-ca.crt")
+        if self.cert_handler.cert and self.cert_handler.key and self.cert_handler.ca:
+            # Save the workload certificates
+            container.push(
+                "/etc/caddy/foxglove.crt",
+                self.cert_handler.cert,
+                make_dirs=True,
+            )
+            container.push(
+                "/etc/caddy/foxglove.key",
+                self.cert_handler.key,
+                make_dirs=True,
+            )
+            # Save the CA among the trusted CAs and trust it
+            container.push(
+                ca_cert_path,
+                self.cert_handler.ca,
+                make_dirs=True,
+            )
+
+            # Repeat for the charm container. We need it there for grafana client requests.
+            ca_cert_path.parent.mkdir(exist_ok=True, parents=True)
+            ca_cert_path.write_text(self.cert_handler.ca)
+        else:
+            container.remove_path("/etc/caddy/foxglove.crt", recursive=True)
+            container.remove_path("/etc/caddy/foxglove.key", recursive=True)
+            container.remove_path(ca_cert_path, recursive=True)
+            # Repeat for the charm container.
+            ca_cert_path.unlink(missing_ok=True)
 
 if __name__ == "__main__":  # pragma: nocover
     main(FoxgloveStudioCharm)
