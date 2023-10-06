@@ -66,10 +66,10 @@ class FoxgloveStudioCharm(CharmBase):
                 self.on.config_changed,
             ],
             item=CatalogueItem(
-                name="Foxglove-studio",
-                icon="bar-chart",
-                url=self.external_url,
-                description=("Foxglove-studio allows you to robotics data"),
+                name="Foxglove Studio",
+                icon="graph-line",
+                url=self.external_url + "/",
+                description=("Query, visualize, and understand your ROS robotics data"),
             ),
         )
 
