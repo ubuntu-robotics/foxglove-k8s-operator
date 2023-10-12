@@ -4,7 +4,7 @@ applications:
     charm: ./foxglove-studio_ubuntu-22.04-amd64.charm
     series: jammy
     resources:
-      foxglove-studio-image: ghcr.io/foxglove/studio:1.68
+      foxglove-studio-image: ghcr.io/foxglove/studio:latest
     scale: 1
     options:
       server-port: 8080
