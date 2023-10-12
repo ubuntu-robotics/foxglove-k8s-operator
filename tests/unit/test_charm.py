@@ -98,7 +98,7 @@ class TestCharm(unittest.TestCase):
                         "redirectRegex": {
                             "permanent": True,
                             "regex": ["^(.*)\/testmodel-foxglove-studio$"],  # noqa
-                            "replacement": ["/testmodel-foxglove-studio"],
+                            "replacement": ["/testmodel-foxglove-studio/"],
                         }
                     },
                 },
