@@ -175,9 +175,9 @@ class FoxgloveStudioCharm(CharmBase):
         middlewares = {
             f"juju-sidecar-trailing-slash-handler-{self.model.name}-{self.model.app.name}": {
                 "redirectRegex": {
-                    "regex": [f"^(.*)\\/{external_path}$"],
-                    "replacement": [f"/{external_path}/"],
-                    "permanent": True,
+                    "regex": f"^(.*)\\/{external_path}$",
+                    "replacement": f"/{external_path}/",
+                    "permanent": False,
                 }
             },
             f"juju-sidecar-noprefix-{self.model.name}-{self.model.app.name}": {

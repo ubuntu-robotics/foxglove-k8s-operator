@@ -96,9 +96,9 @@ class TestCharm(unittest.TestCase):
                     },
                     "juju-sidecar-trailing-slash-handler-testmodel-foxglove-studio": {
                         "redirectRegex": {
-                            "permanent": True,
-                            "regex": ["^(.*)\/testmodel-foxglove-studio$"],  # noqa
-                            "replacement": ["/testmodel-foxglove-studio/"],
+                            "permanent": False,
+                            "regex": "^(.*)\/testmodel-foxglove-studio$",  # noqa
+                            "replacement": "/testmodel-foxglove-studio/",
                         }
                     },
                 },
