@@ -41,6 +41,7 @@ class FoxgloveStudioCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
         self.name = "foxglove-studio"
+        self.service_name = "studio"
 
         self.container = self.unit.get_container(self.name)
 
@@ -124,8 +125,8 @@ class FoxgloveStudioCharm(CharmBase):
 
                 logger.info("Added updated layer 'foxglove-studio' to Pebble plan")
 
-                self.container.restart(self.name)
-                logger.info(f"Restarted '{self.name}' service")
+                self.container.restart(self.service_name)
+                logger.info(f"Restarted '{self.service_name}' service")
             self.unit.status = ActiveStatus()
         else:
             self.unit.status = WaitingStatus("Waiting for Pebble in workload container")
@@ -225,6 +226,8 @@ class FoxgloveStudioCharm(CharmBase):
                 "file-server",
                 "--listen",
                 f":{self.config['server-port']}",
+                "--root",
+                "foxglove"
             ]
         )
 
@@ -233,7 +236,7 @@ class FoxgloveStudioCharm(CharmBase):
                 "summary": "Foxglove-studio k8s layer",
                 "description": "Foxglove-studio k8s layer",
                 "services": {
-                    self.name: {
+                    self.service_name: {
                         "override": "replace",
                         "summary": "foxglove-studio-k8s service",
                         "command": command,
