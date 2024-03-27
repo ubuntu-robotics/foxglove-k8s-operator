@@ -1,4 +1,4 @@
-name: foxglove-studio
+name: foxglove-studio-k8s
 assumes:
   - k8s-api
 summary: |
