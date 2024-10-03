@@ -30,6 +30,7 @@ from ops.pebble import Layer
 import logging
 from charms.traefik_route_k8s.v0.traefik_route import TraefikRouteRequirer
 from charms.catalogue_k8s.v0.catalogue import CatalogueConsumer, CatalogueItem
+from charms.blackbox_k8s.v0.blackbox_probes import BlackboxProbesProvider
 import socket
 
 logger = logging.getLogger()
@@ -72,6 +73,15 @@ class FoxgloveStudioCharm(CharmBase):
                 url=self.external_url + "/",
                 description=("Query, visualize, and understand your ROS robotics data"),
             ),
+        )
+
+        self.blackbox_probes_provider = BlackboxProbesProvider(
+            charm=self,
+            probes=self.self_probe,
+            refresh_event=[
+                self.ingress.on.ready,
+                self.on.update_status,
+            ],
         )
 
     def _on_install(self, _):
@@ -216,6 +226,26 @@ class FoxgloveStudioCharm(CharmBase):
         }
 
         return {"http": {"routers": routers, "services": services, "middlewares": middlewares}}
+
+    @property
+    def self_probe(self):
+        """The self-monitoring blackbox probe."""
+        if not self.ingress.external_host:
+            return []
+
+        probe = {
+            'job_name': 'blackbox_http_2xx',
+            'params': {
+                'module': ['http_2xx']
+            },
+            'static_configs': [
+                {
+                    'targets': [self.external_url],
+                    'labels': {'name': "foxglove-studio"}
+                }
+            ]
+        }
+        return [probe]
 
     @property
     def _pebble_layer(self):
