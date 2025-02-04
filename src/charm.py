@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-#  Copyright 2023 Canonical Ltd.
+#  Copyright 2025 Canonical Ltd.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -17,20 +17,21 @@
 
 """A Kubernetes charm for Foxglove Studio."""
 
-from ops.charm import (
-    CharmBase,
-    HookEvent,
-    RelationJoinedEvent,
-)
-
-from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, OpenedPort, WaitingStatus
-from ops.pebble import Layer
-
 import logging
-from charms.traefik_route_k8s.v0.traefik_route import TraefikRouteRequirer
-from charms.catalogue_k8s.v0.catalogue import CatalogueConsumer, CatalogueItem
 import socket
+
+from charms.catalogue_k8s.v0.catalogue import CatalogueConsumer, CatalogueItem
+from charms.traefik_route_k8s.v0.traefik_route import TraefikRouteRequirer
+from ops.charm import CharmBase, HookEvent, RelationJoinedEvent
+from ops.main import main
+from ops.model import (
+    ActiveStatus,
+    BlockedStatus,
+    MaintenanceStatus,
+    OpenedPort,
+    WaitingStatus,
+)
+from ops.pebble import Layer
 
 logger = logging.getLogger()
 
@@ -227,7 +228,7 @@ class FoxgloveStudioCharm(CharmBase):
                 "--listen",
                 f":{self.config['server-port']}",
                 "--root",
-                "foxglove"
+                "foxglove",
             ]
         )
 
