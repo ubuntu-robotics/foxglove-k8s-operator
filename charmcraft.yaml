@@ -7,3 +7,9 @@ bases:
     run-on:
     - name: ubuntu
       channel: "22.04"
+
+charm-libs:
+  - lib: traefik_k8s.traefik_route
+    version: "0"
+  - lib: catalogue_k8s.catalogue
+    version: "0"

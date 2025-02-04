@@ -21,7 +21,7 @@ import logging
 import socket
 
 from charms.catalogue_k8s.v0.catalogue import CatalogueConsumer, CatalogueItem
-from charms.traefik_route_k8s.v0.traefik_route import TraefikRouteRequirer
+from charms.traefik_k8s.v0.traefik_route import TraefikRouteRequirer
 from ops.charm import CharmBase, HookEvent, RelationJoinedEvent
 from ops.main import main
 from ops.model import (
