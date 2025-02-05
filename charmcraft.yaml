@@ -21,3 +21,10 @@ charm-libs:
     version: "0"
   - lib: tempo_coordinator_k8s.tracing
     version: "0"
+
+parts:
+  charm:
+    build-snaps: [rustup]
+    override-build: |
+      rustup default stable
+      craftctl default
