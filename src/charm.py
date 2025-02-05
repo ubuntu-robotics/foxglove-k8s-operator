@@ -19,8 +19,13 @@
 
 import logging
 import socket
+from typing import Optional
 
 from charms.catalogue_k8s.v0.catalogue import CatalogueConsumer, CatalogueItem
+from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
+from charms.loki_k8s.v1.loki_push_api import LogForwarder
+from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
+from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointRequirer
 from charms.traefik_k8s.v0.traefik_route import TraefikRouteRequirer
 from ops.charm import CharmBase, HookEvent, RelationJoinedEvent
 from ops.main import main
@@ -36,6 +41,15 @@ from ops.pebble import Layer
 logger = logging.getLogger()
 
 
+@trace_charm(
+    tracing_endpoint="tracing_endpoint",
+    extra_types=(
+        CatalogueConsumer,
+        GrafanaDashboardProvider,
+        LogForwarder,
+        TraefikRouteRequirer,
+    ),
+)
 class FoxgloveStudioCharm(CharmBase):
     """Charm to run Foxglove studio on Kubernetes."""
 
@@ -74,6 +88,10 @@ class FoxgloveStudioCharm(CharmBase):
                 description=("Query, visualize, and understand your ROS robotics data"),
             ),
         )
+
+        self.grafana_dashboard_provider = GrafanaDashboardProvider(self)
+        self.log_forwarder = LogForwarder(self)
+        self.tracing_endpoint_requirer = TracingEndpointRequirer(self)
 
     def _on_install(self, _):
         """Handler for the "install" event during which we will update the K8s service."""
@@ -248,6 +266,15 @@ class FoxgloveStudioCharm(CharmBase):
         )
 
         return pebble_layer
+
+    @property
+    def tracing_endpoint(self) -> Optional[str]:
+        """Tempo endpoint for charm tracing."""
+        endpoint = None
+        if self.tracing_endpoint_requirer.is_ready():
+            endpoint = self.tracing_endpoint_requirer.get_endpoint("otlp_http")
+
+        return endpoint
 
 
 if __name__ == "__main__":  # pragma: nocover
