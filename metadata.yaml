@@ -7,7 +7,6 @@ summary: |
 description: |
   Foxglove Studio is an integrated visualization and diagnosis tool for robotics.
 
-
 containers:
   foxglove-studio:
     resource: foxglove-studio-image
@@ -15,7 +14,7 @@ containers:
 resources:
   foxglove-studio-image:
     type: oci-image
-    description: upstream docker image for Foxglove studio
+    description: Foxglove Studio Docker image
     upstream-source: ghcr.io/ubuntu-robotics/foxglove-studio:dev
 
 requires:
@@ -24,3 +23,16 @@ requires:
     limit: 1
   catalogue:
     interface: catalogue
+  logging:
+   interface: loki_push_api
+   optional: true
+  tracing:
+    interface: tracing
+    limit: 1
+    optional: true
+    description: |
+      Integration to send charm traces to a tracing backend.
+
+provides:
+  grafana-dashboard:
+    interface: grafana_dashboard
