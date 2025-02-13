@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-#  Copyright 2023 Canonical Ltd.
+#  Copyright 2025 Canonical Ltd.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -17,25 +17,40 @@
 
 """A Kubernetes charm for Foxglove Studio."""
 
-from ops.charm import (
-    CharmBase,
-    HookEvent,
-    RelationJoinedEvent,
-)
-
-from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, OpenedPort, WaitingStatus
-from ops.pebble import Layer
-
 import logging
-from charms.traefik_route_k8s.v0.traefik_route import TraefikRouteRequirer
-from charms.catalogue_k8s.v0.catalogue import CatalogueConsumer, CatalogueItem
-from charms.blackbox_k8s.v0.blackbox_probes import BlackboxProbesProvider
 import socket
+from typing import Optional
+
+from charms.blackbox_exporter_k8s.v0.blackbox_probes import BlackboxProbesProvider
+from charms.catalogue_k8s.v0.catalogue import CatalogueConsumer, CatalogueItem
+from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
+from charms.loki_k8s.v1.loki_push_api import LogForwarder
+from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
+from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointRequirer
+from charms.traefik_k8s.v0.traefik_route import TraefikRouteRequirer
+from ops.charm import CharmBase, CollectStatusEvent, HookEvent, RelationJoinedEvent
+from ops.main import main
+from ops.model import (
+    ActiveStatus,
+    BlockedStatus,
+    MaintenanceStatus,
+    OpenedPort,
+    WaitingStatus,
+)
+from ops.pebble import Layer
 
 logger = logging.getLogger()
 
 
+@trace_charm(
+    tracing_endpoint="tracing_endpoint",
+    extra_types=(
+        CatalogueConsumer,
+        GrafanaDashboardProvider,
+        LogForwarder,
+        TraefikRouteRequirer,
+    ),
+)
 class FoxgloveStudioCharm(CharmBase):
     """Charm to run Foxglove studio on Kubernetes."""
 
@@ -81,8 +96,12 @@ class FoxgloveStudioCharm(CharmBase):
             refresh_event=[
                 self.ingress.on.ready,
                 self.on.update_status,
+                self.on.config_changed,
             ],
         )
+        self.grafana_dashboard_provider = GrafanaDashboardProvider(self)
+        self.log_forwarder = LogForwarder(self)
+        self.tracing_endpoint_requirer = TracingEndpointRequirer(self)
 
     def _on_install(self, _):
         """Handler for the "install" event during which we will update the K8s service."""
@@ -98,6 +117,9 @@ class FoxgloveStudioCharm(CharmBase):
 
         logger.debug("New application port is requested: %s", port)
         self._update_layer_and_restart(None)
+
+    def _on_collect_status(self, event: CollectStatusEvent):
+        event.add_status(self.blackbox_probes_provider.get_status())
 
     def _on_ingress_ready(self, _) -> None:
         """Once Traefik tells us our external URL, make sure we reconfigure Foxglove Studio."""
@@ -234,16 +256,11 @@ class FoxgloveStudioCharm(CharmBase):
             return []
 
         probe = {
-            'job_name': 'blackbox_http_2xx',
-            'params': {
-                'module': ['http_2xx']
-            },
-            'static_configs': [
-                {
-                    'targets': [self.external_url],
-                    'labels': {'name': "foxglove-studio"}
-                }
-            ]
+            "job_name": "blackbox_http_2xx",
+            "params": {"module": ["http_2xx"]},
+            "static_configs": [
+                {"targets": [self.external_url], "labels": {"name": "foxglove-studio"}}
+            ],
         }
         return [probe]
 
@@ -257,7 +274,7 @@ class FoxgloveStudioCharm(CharmBase):
                 "--listen",
                 f":{self.config['server-port']}",
                 "--root",
-                "foxglove"
+                "foxglove",
             ]
         )
 
@@ -277,6 +294,15 @@ class FoxgloveStudioCharm(CharmBase):
         )
 
         return pebble_layer
+
+    @property
+    def tracing_endpoint(self) -> Optional[str]:
+        """Tempo endpoint for charm tracing."""
+        endpoint = None
+        if self.tracing_endpoint_requirer.is_ready():
+            endpoint = self.tracing_endpoint_requirer.get_endpoint("otlp_http")
+
+        return endpoint
 
 
 if __name__ == "__main__":  # pragma: nocover

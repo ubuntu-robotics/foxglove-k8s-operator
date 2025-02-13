@@ -8,8 +8,9 @@ from unittest.mock import patch
 
 import ops
 import ops.testing
-from charm import FoxgloveStudioCharm
 import yaml
+
+from charm import FoxgloveStudioCharm
 
 ops.testing.SIMULATE_CAN_CONNECT = True
 
@@ -20,9 +21,12 @@ class TestCharm(unittest.TestCase):
         self.addCleanup(self.harness.cleanup)
 
         self.name = "foxglove-studio"
+        self.service_name = "studio"
         self.harness.set_model_name("testmodel")
         self.harness.begin_with_initial_hooks()
         self.harness.container_pebble_ready(self.name)
+
+        self.maxDiff = None
 
     def test_foxglove_studio_pebble_ready(self):
         # Expected plan after Pebble ready with default config
@@ -32,12 +36,14 @@ class TestCharm(unittest.TestCase):
                 "file-server",
                 "--listen",
                 ":8080",
+                "--root",
+                "foxglove",
             ]
         )
 
         expected_plan = {
             "services": {
-                self.name: {
+                self.service_name: {
                     "override": "replace",
                     "summary": "foxglove-studio-k8s service",
                     "command": command,
@@ -52,7 +58,7 @@ class TestCharm(unittest.TestCase):
         # Check we've got the plan we expected
         self.assertEqual(expected_plan, updated_plan)
         # Check the service was started
-        service = self.harness.model.unit.get_container(self.name).get_service(self.name)
+        service = self.harness.model.unit.get_container(self.name).get_service(self.service_name)
         self.assertTrue(service.is_running())
         # Ensure we set an ActiveStatus with no message
         self.assertEqual(self.harness.model.unit.status, ops.ActiveStatus())
@@ -64,9 +70,10 @@ class TestCharm(unittest.TestCase):
         self.harness.update_config({"server-port": 5050})
         # Get the plan now we've run PebbleReady
         updated_plan = self.harness.get_container_pebble_plan("foxglove-studio").to_dict()
-        updated_env = updated_plan["services"]["foxglove-studio"]["command"]
+        self.assertIn("studio", updated_plan["services"])
+        updated_env = updated_plan["services"]["studio"]["command"]
         # Check the config change was effective
-        self.assertEqual(updated_env, "caddy file-server --listen :5050")
+        self.assertEqual(updated_env, "caddy file-server --listen :5050 --root foxglove")
         self.assertEqual(self.harness.model.unit.status, ops.ActiveStatus())
 
     def test_config_changed_invalid(self):
@@ -88,43 +95,43 @@ class TestCharm(unittest.TestCase):
         expected_rel_data = {
             "http": {
                 "middlewares": {
-                    "juju-sidecar-noprefix-testmodel-foxglove-studio": {
+                    "juju-sidecar-noprefix-testmodel-foxglove-studio-k8s": {
                         "stripPrefix": {
                             "forceSlash": False,
-                            "prefixes": ["/testmodel-foxglove-studio"],
+                            "prefixes": ["/testmodel-foxglove-studio-k8s"],
                         }
                     },
-                    "juju-sidecar-trailing-slash-handler-testmodel-foxglove-studio": {
+                    "juju-sidecar-trailing-slash-handler-testmodel-foxglove-studio-k8s": {
                         "redirectRegex": {
                             "permanent": False,
-                            "regex": "^(.*)\/testmodel-foxglove-studio$",  # noqa
-                            "replacement": "/testmodel-foxglove-studio/",
+                            "regex": "^(.*)\/testmodel-foxglove-studio-k8s$",  # noqa
+                            "replacement": "/testmodel-foxglove-studio-k8s/",
                         }
                     },
                 },
                 "routers": {
-                    "juju-testmodel-foxglove-studio-router": {
+                    "juju-testmodel-foxglove-studio-k8s-router": {
                         "entryPoints": ["web"],
                         "middlewares": [
-                            "juju-sidecar-trailing-slash-handler-testmodel-foxglove-studio",
-                            "juju-sidecar-noprefix-testmodel-foxglove-studio",
+                            "juju-sidecar-trailing-slash-handler-testmodel-foxglove-studio-k8s",
+                            "juju-sidecar-noprefix-testmodel-foxglove-studio-k8s",
                         ],
-                        "rule": "PathPrefix(`/testmodel-foxglove-studio`)",
-                        "service": "juju-testmodel-foxglove-studio-service",
+                        "rule": "PathPrefix(`/testmodel-foxglove-studio-k8s`)",
+                        "service": "juju-testmodel-foxglove-studio-k8s-service",
                     },
-                    "juju-testmodel-foxglove-studio-router-tls": {
+                    "juju-testmodel-foxglove-studio-k8s-router-tls": {
                         "entryPoints": ["websecure"],
                         "middlewares": [
-                            "juju-sidecar-trailing-slash-handler-testmodel-foxglove-studio",
-                            "juju-sidecar-noprefix-testmodel-foxglove-studio",
+                            "juju-sidecar-trailing-slash-handler-testmodel-foxglove-studio-k8s",
+                            "juju-sidecar-noprefix-testmodel-foxglove-studio-k8s",
                         ],
-                        "rule": "PathPrefix(`/testmodel-foxglove-studio`)",
-                        "service": "juju-testmodel-foxglove-studio-service",
+                        "rule": "PathPrefix(`/testmodel-foxglove-studio-k8s`)",
+                        "service": "juju-testmodel-foxglove-studio-k8s-service",
                         "tls": {"domains": [{"main": "1.2.3.4", "sans": ["*.1.2.3.4"]}]},
                     },
                 },
                 "services": {
-                    "juju-testmodel-foxglove-studio-service": {
+                    "juju-testmodel-foxglove-studio-k8s-service": {
                         "loadBalancer": {
                             "servers": [
                                 {
@@ -144,5 +151,5 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(yaml.safe_load(rel_data["config"]), expected_rel_data)
 
         self.assertEqual(
-            self.harness.charm.external_url, "http://1.2.3.4/testmodel-foxglove-studio"
+            self.harness.charm.external_url, "http://1.2.3.4/testmodel-foxglove-studio-k8s"
         )
