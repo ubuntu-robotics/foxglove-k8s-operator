@@ -59,12 +59,10 @@ async def test_build_and_deploy(ops_test: OpsTest):
         "tracing",
         GRAFANA_AGENT_APP,
         "tracing-provider",
-        "probes"
+        "probes",
     )
     await ops_test.model.integrate(
-        f"{APP_NAME}:tracing",
-        f"{GRAFANA_AGENT_APP}:tracing-provider",
-        f"{APP_NAME}:probes"
+        f"{APP_NAME}:tracing", f"{GRAFANA_AGENT_APP}:tracing-provider", f"{APP_NAME}:probes"
     )
 
 
