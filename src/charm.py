@@ -21,13 +21,14 @@ import logging
 import socket
 from typing import Optional
 
+from charms.blackbox_exporter_k8s.v0.blackbox_probes import BlackboxProbesProvider
 from charms.catalogue_k8s.v0.catalogue import CatalogueConsumer, CatalogueItem
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v1.loki_push_api import LogForwarder
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointRequirer
 from charms.traefik_k8s.v0.traefik_route import TraefikRouteRequirer
-from ops.charm import CharmBase, HookEvent, RelationJoinedEvent
+from ops.charm import CharmBase, CollectStatusEvent, HookEvent, RelationJoinedEvent
 from ops.main import main
 from ops.model import (
     ActiveStatus,
@@ -89,6 +90,15 @@ class FoxgloveStudioCharm(CharmBase):
             ),
         )
 
+        self.blackbox_probes_provider = BlackboxProbesProvider(
+            charm=self,
+            probes=self.self_probe,
+            refresh_event=[
+                self.ingress.on.ready,
+                self.on.update_status,
+                self.on.config_changed,
+            ],
+        )
         self.grafana_dashboard_provider = GrafanaDashboardProvider(self)
         self.log_forwarder = LogForwarder(self)
         self.tracing_endpoint_requirer = TracingEndpointRequirer(self)
@@ -107,6 +117,9 @@ class FoxgloveStudioCharm(CharmBase):
 
         logger.debug("New application port is requested: %s", port)
         self._update_layer_and_restart(None)
+
+    def _on_collect_status(self, event: CollectStatusEvent):
+        event.add_status(self.blackbox_probes_provider.get_status())
 
     def _on_ingress_ready(self, _) -> None:
         """Once Traefik tells us our external URL, make sure we reconfigure Foxglove Studio."""
@@ -235,6 +248,21 @@ class FoxgloveStudioCharm(CharmBase):
         }
 
         return {"http": {"routers": routers, "services": services, "middlewares": middlewares}}
+
+    @property
+    def self_probe(self):
+        """The self-monitoring blackbox probe."""
+        if not self.ingress.external_host:
+            return []
+
+        probe = {
+            "job_name": "blackbox_http_2xx",
+            "params": {"module": ["http_2xx"]},
+            "static_configs": [
+                {"targets": [self.external_url], "labels": {"name": "foxglove-studio"}}
+            ],
+        }
+        return [probe]
 
     @property
     def _pebble_layer(self):

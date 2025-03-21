@@ -36,3 +36,7 @@ requires:
 provides:
   grafana-dashboard:
     interface: grafana_dashboard
+  probes:
+    interface: blackbox_exporter_probes
+    description: |
+      Send over to blackbox exporter the endpoints we want it to probe.

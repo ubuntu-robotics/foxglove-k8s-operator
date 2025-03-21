@@ -21,6 +21,8 @@ charm-libs:
     version: "0"
   - lib: tempo_coordinator_k8s.tracing
     version: "0"
+  - lib: blackbox_exporter_k8s.blackbox_probes
+    version: "0"
 
 parts:
   charm:
