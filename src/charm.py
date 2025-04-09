@@ -26,7 +26,10 @@ from charms.catalogue_k8s.v0.catalogue import CatalogueConsumer, CatalogueItem
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v1.loki_push_api import LogForwarder
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
-from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointRequirer
+from charms.tempo_coordinator_k8s.v0.tracing import (
+    ProtocolNotRequestedError,
+    TracingEndpointRequirer,
+)
 from charms.traefik_k8s.v0.traefik_route import TraefikRouteRequirer
 from ops.charm import CharmBase, CollectStatusEvent, HookEvent, RelationJoinedEvent
 from ops.main import main
@@ -300,7 +303,13 @@ class FoxgloveStudioCharm(CharmBase):
         """Tempo endpoint for charm tracing."""
         endpoint = None
         if self.tracing_endpoint_requirer.is_ready():
-            endpoint = self.tracing_endpoint_requirer.get_endpoint("otlp_http")
+            try:
+                endpoint = self.tracing_endpoint_requirer.get_endpoint("otlp_http")
+            except ProtocolNotRequestedError as e:
+                logger.error(
+                    f"Failed to get tracing endpoint with protocol 'otlp_http'.\nError: {e}"
+                )
+                pass
 
         return endpoint
 
