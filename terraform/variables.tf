@@ -46,6 +46,6 @@ variable "resources" {
   description = "Resources used by the charm"
   type        = map(string)
   default = {
-    foxglove-studio-image: "ghcr.io/ubuntu-robotics/foxglove-studio:dev"
+    foxglove-studio-image : "ghcr.io/ubuntu-robotics/foxglove-studio:dev"
   }
 }
