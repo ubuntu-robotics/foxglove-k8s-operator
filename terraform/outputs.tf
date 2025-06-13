@@ -1,14 +1,14 @@
 output "app_name" {
-  value = juju_application.foxglove_studio.name
+  value       = juju_application.foxglove_studio.name
   description = "The name of the deployed application"
 }
 
 output "requires" {
   value = {
-    catalogue     = "catalogue"
-    ingress       = "ingress"
-    logging       = "logging"
-    tracing       = "tracing"
+    catalogue = "catalogue"
+    ingress   = "ingress"
+    logging   = "logging"
+    tracing   = "tracing"
   }
   description = "The integration endpoints required by the application"
 }
