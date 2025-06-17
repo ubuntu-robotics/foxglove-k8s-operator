@@ -1,14 +1,13 @@
-# Terraform module for `foxglove-studio-k8s`
+# Terraform module for `foxglove-k8s`
 
-This is a Terraform module facilitating the deployment of the `foxglove-studio-k8s` charm,
+This is a Terraform module facilitating the deployment of the `foxglove-k8s` charm,
 using the [Terraform Juju provider](https://github.com/juju/terraform-provider-juju/).
 For more information,
 refer to the provider [documentation](https://registry.terraform.io/providers/juju/juju/latest/docs).
 
-## Requirements
-
-This module requires a Juju K8s model to be available.
-Refer to the [usage section](#usage) below for more details.
+> [!IMPORTANT]
+> This module requires a Juju K8s model to be available.
+> Refer to the [usage section](#usage) below for more details.
 
 ## Usage
 

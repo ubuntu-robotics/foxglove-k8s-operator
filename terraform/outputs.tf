@@ -10,7 +10,7 @@ output "requires" {
     logging   = "logging"
     tracing   = "tracing"
   }
-  description = "The integration endpoints required by the application"
+  description = "Map of the integration endpoints required by the application"
 }
 
 output "provides" {
@@ -18,5 +18,5 @@ output "provides" {
     grafana_dashboard = "grafana-dashboard"
     probes            = "probes"
   }
-  description = "The integration endpoints provided by the application"
+  description = "Map of the integration endpoints provided by the application"
 }
