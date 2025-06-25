@@ -1,4 +1,4 @@
-venv/
+*venv/
 build/
 *.charm
 .tox/
@@ -8,3 +8,5 @@ __pycache__/
 .idea
 .vscode/
 .ruff_cache
+*.egg-info
+.charm_tracing_buffer.raw
