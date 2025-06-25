@@ -6,6 +6,7 @@
 import ipaddress
 import logging
 import socket
+import warnings
 from typing import List, Optional, Union
 
 from ops.charm import CharmBase
@@ -13,7 +14,7 @@ from ops.framework import BoundEvent, EventBase, EventSource, Object, ObjectEven
 
 LIBID = "fa28b361293b46668bcd1f209ada6983"
 LIBAPI = 0
-LIBPATCH = 5
+LIBPATCH = 7
 
 DEFAULT_RELATION_NAME = "catalogue"
 
@@ -53,6 +54,13 @@ class CatalogueConsumer(Object):
         self.framework.observe(events.relation_created, self._on_relation_changed)
 
         self._register_refresh_event(refresh_event)
+
+        warnings.warn(
+            "charms.catalogue_k8s.v0.catalogue is deprecated. "
+            "Use charms.catalogue_k8s.v1.catalogue instead. "
+            "For more details, see https://github.com/canonical/catalogue-k8s-operator/issues/41.",
+            category=DeprecationWarning,
+        )
 
     def _register_refresh_event(
         self, refresh_event: Optional[Union[BoundEvent, List[BoundEvent]]] = None
@@ -96,7 +104,7 @@ class CatalogueConsumer(Object):
             relation.data[self._charm.model.app]["icon"] = self._item.icon
 
     def unit_address(self, relation):
-        """The unit address of the consumer, on which it is reachable.
+        """Return the unit address of the consumer, on which it is reachable.
 
         Requires ingress to be connected for it to be routable.
         """
@@ -117,6 +125,7 @@ class CatalogueConsumer(Object):
 
         Args:
             address: a string representing a unit address
+
         """
         try:
             _ = ipaddress.ip_address(address)
