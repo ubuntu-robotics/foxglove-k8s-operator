@@ -50,7 +50,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
 
     # Deploying grafana-agent-k8s and add the logging relation
     await deploy_and_assert_grafana_agent(
-        ops_test.model, APP_NAME, metrics=False, dashboard=True, logging=True
+        ops_test.model, APP_NAME, channel="1/stable", metrics=False, dashboard=True, logging=True
     )
 
     logger.info(
@@ -93,7 +93,7 @@ async def test_tracing(ops_test: OpsTest):
 
 async def test_integrate_blackbox(ops_test: OpsTest):
     await ops_test.model.deploy(
-        "blackbox-exporter-k8s", "blackbox", channel="latest/edge", trust=True
+        "blackbox-exporter-k8s", "blackbox", channel="1/edge", trust=True
     )
 
     logger.info(
