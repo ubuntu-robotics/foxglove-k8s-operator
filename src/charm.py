@@ -19,7 +19,8 @@
 
 import logging
 import socket
-from typing import Optional
+from typing import Optional, cast
+from urllib.parse import urlparse
 
 from charms.blackbox_exporter_k8s.v0.blackbox_probes import BlackboxProbesProvider
 from charms.catalogue_k8s.v0.catalogue import CatalogueConsumer, CatalogueItem
@@ -30,8 +31,8 @@ from charms.tempo_coordinator_k8s.v0.tracing import (
     ProtocolNotRequestedError,
     TracingEndpointRequirer,
 )
-from charms.traefik_k8s.v0.traefik_route import TraefikRouteRequirer
-from ops.charm import CharmBase, CollectStatusEvent, HookEvent, RelationJoinedEvent
+from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer
+from ops.charm import CharmBase, CollectStatusEvent
 from ops.main import main
 from ops.model import (
     ActiveStatus,
@@ -51,7 +52,7 @@ logger = logging.getLogger()
         CatalogueConsumer,
         GrafanaDashboardProvider,
         LogForwarder,
-        TraefikRouteRequirer,
+        IngressPerAppRequirer,
     ),
 )
 class FoxgloveStudioCharm(CharmBase):
@@ -64,13 +65,11 @@ class FoxgloveStudioCharm(CharmBase):
 
         self.container = self.unit.get_container(self.name)
 
-        # -- ingress via raw traefik_route
-        self.ingress = TraefikRouteRequirer(self, self.model.get_relation("ingress"), "ingress")  # type: ignore
-        self.framework.observe(self.on["ingress"].relation_joined, self._configure_ingress)
+        self.ingress = IngressPerAppRequirer(
+            self, strip_prefix=True, port=cast(int, self.config["server-port"])
+        )
         self.framework.observe(self.ingress.on.ready, self._on_ingress_ready)
-        self.framework.observe(self.on.leader_elected, self._configure_ingress)
-        self.framework.observe(self.on.config_changed, self._configure_ingress)
-
+        self.framework.observe(self.ingress.on.revoked, self._on_ingress_revoked)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(
             self.on.foxglove_studio_pebble_ready, self._update_layer_and_restart
@@ -119,6 +118,7 @@ class FoxgloveStudioCharm(CharmBase):
             return
 
         logger.debug("New application port is requested: %s", port)
+        self.ingress.provide_ingress_requirements(port=cast(int, self.config["server-port"]))
         self._update_layer_and_restart(None)
 
     def _on_collect_status(self, event: CollectStatusEvent):
@@ -128,21 +128,8 @@ class FoxgloveStudioCharm(CharmBase):
         """Once Traefik tells us our external URL, make sure we reconfigure Foxglove Studio."""
         self._update_layer_and_restart(None)
 
-    def _configure_ingress(self, event: HookEvent) -> None:
-        """Set up ingress if a relation is joined, config changed, or a new leader election."""
-        if not self.unit.is_leader():
-            return
-
-        # If it's a RelationJoinedEvent, set it in the ingress object
-        if isinstance(event, RelationJoinedEvent):
-            self.ingress._relation = event.relation
-
-        # No matter what, check readiness -- this blindly checks whether `ingress._relation` is not
-        # None, so it overlaps a little with the above, but works as expected on leader elections
-        # and config-change
-        if self.ingress.is_ready():
-            self._update_layer_and_restart(None)
-            self.ingress.submit_to_traefik(self._ingress_config)
+    def _on_ingress_revoked(self, _) -> None:
+        logger.info("This app no longer has ingress")
 
     def _update_layer_and_restart(self, event) -> None:
         """Define and start a workload using the Pebble API."""
@@ -190,72 +177,37 @@ class FoxgloveStudioCharm(CharmBase):
         return "http"
 
     @property
+    def internal_host(self) -> str:
+        """Return workload's internal host. Used for ingress."""
+        return f"{socket.getfqdn()}"
+
+    @property
     def internal_url(self) -> str:
         """Return workload's internal URL. Used for ingress."""
         return f"{self._scheme}://{socket.getfqdn()}:{self.config['server-port']}"
 
     @property
     def external_url(self) -> str:
-        """Return the external hostname configured, if any."""
-        if self.ingress.external_host:
-            path_prefix = f"{self.model.name}-{self.model.app.name}"
-            return f"{self._scheme}://{self.ingress.external_host}/{path_prefix}"
-        return self.internal_url
+        """Return the external URL configured, if any."""
+        url = self.ingress.url
+        if not url:
+            logger.warning("No ingress URL configured, returning internal URL")
+            return self.internal_url
+        return url
 
     @property
-    def _ingress_config(self) -> dict:
-        """Build a raw ingress configuration for Traefik."""
-        # The path prefix is the same as in ingress per app
-        external_path = f"{self.model.name}-{self.model.app.name}"
-
-        middlewares = {
-            f"juju-sidecar-trailing-slash-handler-{self.model.name}-{self.model.app.name}": {
-                "redirectRegex": {
-                    "regex": f"^(.*)\\/{external_path}$",
-                    "replacement": f"/{external_path}/",
-                    "permanent": False,
-                }
-            },
-            f"juju-sidecar-noprefix-{self.model.name}-{self.model.app.name}": {
-                "stripPrefix": {"forceSlash": False, "prefixes": [f"/{external_path}"]},
-            },
-        }
-
-        routers = {
-            "juju-{}-{}-router".format(self.model.name, self.model.app.name): {
-                "entryPoints": ["web"],
-                "rule": f"PathPrefix(`/{external_path}`)",
-                "middlewares": list(middlewares.keys()),
-                "service": "juju-{}-{}-service".format(self.model.name, self.app.name),
-            },
-            "juju-{}-{}-router-tls".format(self.model.name, self.model.app.name): {
-                "entryPoints": ["websecure"],
-                "rule": f"PathPrefix(`/{external_path}`)",
-                "middlewares": list(middlewares.keys()),
-                "service": "juju-{}-{}-service".format(self.model.name, self.app.name),
-                "tls": {
-                    "domains": [
-                        {
-                            "main": self.ingress.external_host,
-                            "sans": [f"*.{self.ingress.external_host}"],
-                        },
-                    ],
-                },
-            },
-        }
-
-        services = {
-            "juju-{}-{}-service".format(self.model.name, self.model.app.name): {
-                "loadBalancer": {"servers": [{"url": self.internal_url}]}
-            }
-        }
-
-        return {"http": {"routers": routers, "services": services, "middlewares": middlewares}}
+    def external_host(self) -> str:
+        """Return the external hostname configured, if any."""
+        url = self.ingress.url
+        if not url:
+            logger.warning("No ingress URL configured, returning internal URL")
+            return self.internal_host
+        return urlparse(url).hostname or self.internal_host
 
     @property
     def self_probe(self):
         """The self-monitoring blackbox probe."""
-        if not self.ingress.external_host:
+        if not self.external_host:
             return []
 
         probe = {

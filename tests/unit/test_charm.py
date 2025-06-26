@@ -4,11 +4,9 @@
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 
 import unittest
-from unittest.mock import patch
 
 import ops
 import ops.testing
-import yaml
 
 from charm import FoxgloveStudioCharm
 
@@ -83,73 +81,3 @@ class TestCharm(unittest.TestCase):
         self.harness.update_config({"server-port": 22})
         # Check the charm is in BlockedStatus
         self.assertIsInstance(self.harness.model.unit.status, ops.BlockedStatus)
-
-    @patch.multiple("charm.TraefikRouteRequirer", external_host="1.2.3.4")
-    @patch("socket.getfqdn", new=lambda *args: "foxglove-studio-0.testmodel.svc.cluster.local")
-    def test_ingress_relation_sets_options_and_rel_data(self):
-        self.harness.set_leader(True)
-        self.harness.container_pebble_ready(self.name)
-        rel_id = self.harness.add_relation("ingress", "traefik")
-        self.harness.add_relation_unit(rel_id, "traefik/0")
-
-        expected_rel_data = {
-            "http": {
-                "middlewares": {
-                    "juju-sidecar-noprefix-testmodel-foxglove-studio-k8s": {
-                        "stripPrefix": {
-                            "forceSlash": False,
-                            "prefixes": ["/testmodel-foxglove-studio-k8s"],
-                        }
-                    },
-                    "juju-sidecar-trailing-slash-handler-testmodel-foxglove-studio-k8s": {
-                        "redirectRegex": {
-                            "permanent": False,
-                            "regex": "^(.*)\/testmodel-foxglove-studio-k8s$",  # noqa
-                            "replacement": "/testmodel-foxglove-studio-k8s/",
-                        }
-                    },
-                },
-                "routers": {
-                    "juju-testmodel-foxglove-studio-k8s-router": {
-                        "entryPoints": ["web"],
-                        "middlewares": [
-                            "juju-sidecar-trailing-slash-handler-testmodel-foxglove-studio-k8s",
-                            "juju-sidecar-noprefix-testmodel-foxglove-studio-k8s",
-                        ],
-                        "rule": "PathPrefix(`/testmodel-foxglove-studio-k8s`)",
-                        "service": "juju-testmodel-foxglove-studio-k8s-service",
-                    },
-                    "juju-testmodel-foxglove-studio-k8s-router-tls": {
-                        "entryPoints": ["websecure"],
-                        "middlewares": [
-                            "juju-sidecar-trailing-slash-handler-testmodel-foxglove-studio-k8s",
-                            "juju-sidecar-noprefix-testmodel-foxglove-studio-k8s",
-                        ],
-                        "rule": "PathPrefix(`/testmodel-foxglove-studio-k8s`)",
-                        "service": "juju-testmodel-foxglove-studio-k8s-service",
-                        "tls": {"domains": [{"main": "1.2.3.4", "sans": ["*.1.2.3.4"]}]},
-                    },
-                },
-                "services": {
-                    "juju-testmodel-foxglove-studio-k8s-service": {
-                        "loadBalancer": {
-                            "servers": [
-                                {
-                                    "url": "http://foxglove-studio-0.testmodel.svc.cluster.local:8080"
-                                }
-                            ]
-                        }
-                    },
-                },
-            }
-        }
-        rel_data = self.harness.get_relation_data(rel_id, self.harness.charm.app.name)
-
-        # The insanity of YAML here. It works for the lib, but a single load just strips off
-        # the extra quoting and leaves regular YAML. Double parse it for the tests
-        self.maxDiff = None
-        self.assertEqual(yaml.safe_load(rel_data["config"]), expected_rel_data)
-
-        self.assertEqual(
-            self.harness.charm.external_url, "http://1.2.3.4/testmodel-foxglove-studio-k8s"
-        )
