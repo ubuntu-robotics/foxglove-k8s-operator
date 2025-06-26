@@ -24,7 +24,7 @@ from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
 
-METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
+METADATA = yaml.safe_load(Path("./charmcraft.yaml").read_text())
 APP_NAME = METADATA["name"]
 RESOURCE_NAME = "foxglove-studio-image"
 RESOURCE_PATH = METADATA["resources"][RESOURCE_NAME]["upstream-source"]
