@@ -11,7 +11,7 @@ on:
   pull_request:
     branch:
       - main
-    secret:
+    secrets:
       CHARMHUB_TOKEN:
         default: ${{ secrets.CHARMHUB_TOKEN }}
 
