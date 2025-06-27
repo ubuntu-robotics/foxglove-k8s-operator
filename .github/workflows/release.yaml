@@ -17,6 +17,6 @@ on:
 
 jobs:
   release:
-    uses: ./.github/workflows/charm-release.yaml@
+    uses: ./.github/workflows/charm-release.yaml
     secrets:
       CHARMHUB_TOKEN: ${{ secrets.charmhub_token }}
