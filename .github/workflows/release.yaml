@@ -11,9 +11,9 @@ on:
   pull_request:
     branch:
       - main
-    secrets:
-      CHARMHUB_TOKEN:
-        default: ${{ secrets.CHARMHUB_TOKEN }}
+#    secrets:
+#      CHARMHUB_TOKEN:
+#        default: ${{ secrets.CHARMHUB_TOKEN }}
 
 jobs:
   release:
