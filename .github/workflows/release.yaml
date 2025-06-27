@@ -8,7 +8,7 @@ on:
       - '**.md'
     branches:
       - main
-  pull-request:
+  pull_request:
     branch:
       - main
     secret:
