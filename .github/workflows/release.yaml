@@ -8,8 +8,12 @@ on:
       - '**.md'
     branches:
       - main
+  pull_request:
+    branch:
+      - main
 
 jobs:
   release:
-    uses: canonical/observability/.github/workflows/charm-release.yaml@v0
-    secrets: inherit
+    uses: guillaumebeuzeboc/observability/.github/workflows/charm-release.yaml@Guillaumebeuzeboc-patch-2
+    secrets:
+      CHARMHUB_TOKEN: ${{ secrets.charmhub_token }}

@@ -10,3 +10,4 @@ __pycache__/
 .ruff_cache
 *.egg-info
 .charm_tracing_buffer.raw
+cos-tool-*
