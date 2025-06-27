@@ -64,6 +64,7 @@ class FoxgloveStudioCharm(CharmBase):
 
         self.container = self.unit.get_container(self.name)
 
+        # comment to trigger ci
         # -- ingress via raw traefik_route
         self.ingress = TraefikRouteRequirer(self, self.model.get_relation("ingress"), "ingress")  # type: ignore
         self.framework.observe(self.on["ingress"].relation_joined, self._configure_ingress)

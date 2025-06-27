@@ -11,5 +11,6 @@ on:
 
 jobs:
   release:
-    uses: canonical/observability/.github/workflows/charm-release.yaml@v0
-    secrets: inherit
+    uses: ./.github/workflows/charm-release.yaml
+    secrets:
+      CHARMHUB_TOKEN: ${{ secrets.charmhub_token }}
