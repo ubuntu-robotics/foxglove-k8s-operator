@@ -17,4 +17,5 @@ jobs:
     uses: canonical/observability/.github/workflows/charm-promote.yaml@main
     with:
       promotion: ${{ github.event.inputs.promotion }}
-    secrets: inherit
+    secrets:
+      CHARMHUB_TOKEN: ${{ secrets.charmhub_token }}
