@@ -11,3 +11,11 @@ __pycache__/
 *.egg-info
 .charm_tracing_buffer.raw
 cos-tool-*
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+*.tfvars
+*.tfplan
