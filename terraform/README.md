@@ -38,7 +38,6 @@ terraform apply -var="model_uuid=<MODEL_UUID>"
 | Name | Type |
 |------|------|
 | [juju_application.foxglove_studio](https://registry.terraform.io/providers/juju/juju/latest/docs/resources/application) | resource |
-| [juju_model.model](https://registry.terraform.io/providers/juju/juju/latest/docs/data-sources/model) | data source |
 
 ## Inputs
 
