@@ -25,13 +25,13 @@ terraform apply -var="model_uuid=<MODEL_UUID>"
 | Name | Version |
 |------|---------|
 | terraform | >= 1.5 |
-| juju | >= 1.0.0 |
+| juju | ~> 1.0 |
 
 ## Providers
 
 | Name | Version |
 |------|---------|
-| juju | >= 1.0.0 |
+| juju | ~> 1.0 |
 
 ## Resources
 
@@ -51,7 +51,7 @@ terraform apply -var="model_uuid=<MODEL_UUID>"
 | constraints | String listing constraints for the application | `string` | `"arch=amd64"` | no |
 | resources | Resources used by the charm | `map(string)` | ```{ "foxglove-studio-image": "ghcr.io/ubuntu-robotics/foxglove-studio:dev" }``` | no |
 | revision | Revision number of the charm | `number` | `null` | no |
-| storage | Map of storage used by the application. Defaults to 1 GB, allocated by Juju | `map(string)` | `{}` | no |
+| storage\_directives | Map of storage used by the application. Defaults to 1 GB, allocated by Juju | `map(string)` | `{}` | no |
 | units | Unit count/scale | `number` | `1` | no |
 
 ## Outputs
