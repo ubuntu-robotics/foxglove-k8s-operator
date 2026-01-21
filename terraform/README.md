@@ -49,7 +49,7 @@ terraform apply -var="model_uuid=<MODEL_UUID>"
 | channel | Channel that the charm is deployed from | `string` | `"latest/edge"` | no |
 | config | Map of the charm configuration options | `map(string)` | `{}` | no |
 | constraints | String listing constraints for the application | `string` | `"arch=amd64"` | no |
-| resources | Resources used by the charm | `map(string)` | ```{ "foxglove-studio-image": "ghcr.io/ubuntu-robotics/foxglove-studio:dev" }``` | no |
+| resources | Resources used by the charm | `map(string)` | ```{ "foxglove-studio-image": "ghcr.io/ubuntu-robotics/foxglove-studio:track_v0" }``` | no |
 | revision | Revision number of the charm | `number` | `null` | no |
 | storage | Map of storage used by the application. Defaults to 1 GB, allocated by Juju | `map(string)` | `{}` | no |
 | units | Unit count/scale | `number` | `1` | no |
