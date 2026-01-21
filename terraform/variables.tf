@@ -29,19 +29,6 @@ variable "model_uuid" {
   type        = string
 }
 
-variable "revision" {
-  description = "Revision number of the charm"
-  type        = number
-  nullable    = true
-  default     = null
-}
-
-variable "units" {
-  description = "Unit count/scale"
-  type        = number
-  default     = 1
-}
-
 variable "resources" {
   description = "Resources used by the charm"
   type        = map(string)
@@ -50,8 +37,21 @@ variable "resources" {
   }
 }
 
-variable "storage" {
+variable "revision" {
+  description = "Revision number of the charm"
+  type        = number
+  nullable    = true
+  default     = null
+}
+
+variable "storage_directives" {
   description = "Map of storage used by the application. Defaults to 1 GB, allocated by Juju"
   type        = map(string)
   default     = {}
+}
+
+variable "units" {
+  description = "Unit count/scale"
+  type        = number
+  default     = 1
 }
