@@ -38,7 +38,7 @@ resources:
   foxglove-studio-image:
     type: oci-image
     description: Foxglove Studio Docker image
-    upstream-source: ghcr.io/ubuntu-robotics/foxglove-studio:dev
+    upstream-source: ghcr.io/ubuntu-robotics/foxglove-studio:track_0
 
 requires:
   ingress:
