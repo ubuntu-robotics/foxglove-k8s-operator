@@ -13,5 +13,7 @@ on:
 jobs:
   release:
     uses: guillaumebeuzeboc/observability/.github/workflows/charm-release.yaml@Guillaumebeuzeboc-patch-2
+    with:
+      juju-channel: "3.6/stable"
     secrets:
       CHARMHUB_TOKEN: ${{ secrets.charmhub_token }}
