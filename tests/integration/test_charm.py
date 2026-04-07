@@ -2,123 +2,106 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import asyncio
 import logging
-from pathlib import Path
 
-import pytest
-import yaml
-from charmed_kubeflow_chisme.testing import (
+import jubilant
+
+from tests.integration.constants import (
+    APP_GRAFANA_DASHBOARD,
+    APP_LOGGING,
+    APP_NAME,
+    APP_PROBES,
+    APP_TRACING,
+    BLACKBOX_APP,
+    BLACKBOX_PROBES,
     GRAFANA_AGENT_APP,
-    assert_grafana_dashboards,
-    assert_logging,
-    deploy_and_assert_grafana_agent,
-    get_grafana_dashboards,
+    GRAFANA_AGENT_GRAFANA_DASHBOARD,
+    GRAFANA_AGENT_LOGGING_PROVIDER,
+    GRAFANA_AGENT_TRACING_PROVIDER,
 )
-from charmed_kubeflow_chisme.testing.cos_integration import (
-    PROVIDES,
-    _get_app_relation_data,
-    _get_unit_relation_data,
-)
-from pytest_operator.plugin import OpsTest
+from tests.integration.juju import relation_application_data
 
 logger = logging.getLogger(__name__)
 
-METADATA = yaml.safe_load(Path("./charmcraft.yaml").read_text())
-APP_NAME = METADATA["name"]
-RESOURCE_NAME = "foxglove-studio-image"
-RESOURCE_PATH = METADATA["resources"][RESOURCE_NAME]["upstream-source"]
 
-
-@pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest):
-    """Build the charm-under-test and deploy it together with related charms.
-
-    Assert on the unit status before any relations/configurations take place.
-    """
-    # Build and deploy charm from local source folder
-    charm = await ops_test.build_charm(".")
-    resources = {RESOURCE_NAME: RESOURCE_PATH}
-
-    # Deploy the charm and wait for active/idle status
-    await asyncio.gather(
-        ops_test.model.deploy(charm, resources=resources, application_name=APP_NAME),
-        ops_test.model.wait_for_idle(
-            apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=1000
-        ),
+def wait_for_active_idle_without_error(juju: jubilant.Juju, timeout: int = 60 * 45):
+    """Wait for the model to settle without errors."""
+    logger.info(f"waiting for the model ({juju.model}) to settle ...")
+    # grafana_agent_app stays in blocked state by design
+    juju.wait(
+        ready=lambda status: jubilant.all_active(status, APP_NAME, BLACKBOX_APP),
+        delay=10,
+        timeout=timeout,
+        error=jubilant.any_error,
+    )
+    logger.info("waiting for agents idle ...")
+    juju.wait(
+        jubilant.all_agents_idle,
+        delay=10,
+        timeout=timeout,
+        error=lambda status: jubilant.any_error(status, APP_NAME, BLACKBOX_APP),
     )
 
-    # Deploying grafana-agent-k8s and add the logging relation
-    await deploy_and_assert_grafana_agent(
-        ops_test.model, APP_NAME, channel="1/stable", metrics=False, dashboard=True, logging=True
+
+def test_deploy(juju):
+    """Assert deployment of charm-under-test reaches active status."""
+    wait_for_active_idle_without_error(juju)
+
+
+def test_logging(juju):
+    """Test logging relation data bag is populated."""
+    app_unit = f"{APP_NAME}/0"
+    agent_unit = f"{GRAFANA_AGENT_APP}/0"
+    relation_data = relation_application_data(
+        juju,
+        app_unit,
+        APP_LOGGING,
+        agent_unit,
+        GRAFANA_AGENT_LOGGING_PROVIDER,
     )
-
-    logger.info(
-        "Adding relation: %s:%s and %s:%s",
-        APP_NAME,
-        "tracing",
-        GRAFANA_AGENT_APP,
-        "tracing-provider",
-    )
-    await ops_test.model.integrate(f"{APP_NAME}:tracing", f"{GRAFANA_AGENT_APP}:tracing-provider")
+    assert relation_data
 
 
-async def test_status(ops_test):
-    """Assert on the unit status."""
-    assert ops_test.model.applications[APP_NAME].units[0].workload_status == "active"
-
-
-async def test_logging(ops_test: OpsTest):
-    """Test logging is defined in relation data bag."""
-    app = ops_test.model.applications[APP_NAME]
-    await assert_logging(app)
-
-
-async def test_grafana_dashboards(ops_test: OpsTest):
+def test_grafana_dashboards(juju):
     """Test Grafana dashboards are defined in relation data bag."""
-    app = ops_test.model.applications[APP_NAME]
-    dashboards = get_grafana_dashboards()
-    logger.info("found dashboards: %s", dashboards)
-    await assert_grafana_dashboards(app, dashboards)
-
-
-async def test_tracing(ops_test: OpsTest):
-    """Test logging is defined in relation data bag."""
-    app = ops_test.model.applications[APP_NAME]
-
-    unit_relation_data = await _get_unit_relation_data(app, "tracing", side=PROVIDES)
-
-    assert unit_relation_data
-
-
-async def test_integrate_blackbox(ops_test: OpsTest):
-    await ops_test.model.deploy("blackbox-exporter-k8s", "blackbox", channel="1/edge", trust=True)
-
-    logger.info(
-        "Adding relation: %s:%s",
-        APP_NAME,
-        "probes",
+    app_unit = f"{APP_NAME}/0"
+    agent_unit = f"{GRAFANA_AGENT_APP}/0"
+    relation_data = relation_application_data(
+        juju,
+        agent_unit,
+        GRAFANA_AGENT_GRAFANA_DASHBOARD,
+        app_unit,
+        APP_GRAFANA_DASHBOARD,
     )
+    assert relation_data
+    assert relation_data[0].get("dashboards")
 
-    await ops_test.model.integrate(
-        f"{APP_NAME}",
-        "blackbox:probes",
+
+def test_tracing(juju):
+    """Test tracing relation data bag is populated."""
+    app_unit = f"{APP_NAME}/0"
+    agent_unit = f"{GRAFANA_AGENT_APP}/0"
+    relation_data = relation_application_data(
+        juju,
+        app_unit,
+        APP_TRACING,
+        agent_unit,
+        GRAFANA_AGENT_TRACING_PROVIDER,
     )
-
-    await ops_test.model.wait_for_idle(
-        apps=[
-            f"{APP_NAME}",
-            "blackbox",
-        ],
-        status="active",
-    )
+    assert relation_data
 
 
-async def test_blackbox(ops_test: OpsTest):
+def test_blackbox(juju):
     """Test probes are defined in relation data bag."""
-    app = ops_test.model.applications[APP_NAME]
-
-    relation_data = await _get_app_relation_data(app, "probes", side=PROVIDES)
-
-    assert relation_data.get("scrape_metadata")
-    assert relation_data.get("scrape_probes")
+    app_unit = f"{APP_NAME}/0"
+    blackbox_unit = f"{BLACKBOX_APP}/0"
+    relation_data = relation_application_data(
+        juju,
+        blackbox_unit,
+        BLACKBOX_PROBES,
+        app_unit,
+        APP_PROBES,
+    )
+    assert relation_data
+    assert relation_data[0].get("scrape_metadata")
+    assert relation_data[0].get("scrape_probes")
