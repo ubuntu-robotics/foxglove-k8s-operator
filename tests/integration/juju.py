@@ -13,7 +13,7 @@ import jubilant
 
 def show_unit(juju: jubilant.Juju, unit: str) -> dict:
     """Return show-unit data for a unit."""
-    output = juju._cli("show-unit", unit, "--format", "json")
+    output = juju.cli("show-unit", unit, "--format", "json")
     if isinstance(output, (tuple, list)):
         output = output[0]
     data = json.loads(output)
