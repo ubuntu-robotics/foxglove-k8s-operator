@@ -125,9 +125,9 @@ def app_fixture(juju: jubilant.Juju, metadata: dict[str, Any], charm_file: str) 
     )
     juju.integrate(f"{APP_NAME}:{APP_PROBES}", f"{BLACKBOX_APP}:{BLACKBOX_PROBES}")
 
-    juju.wait(lambda status: jubilant.all_active(status, APP_NAME, BLACKBOX_APP), timeout=3000)
+    juju.wait(lambda status: jubilant.all_active(status, APP_NAME, BLACKBOX_APP), timeout=15*60)
 
     # grafana_agent_app is
     # in a blocked state by design.
-    juju.wait(lambda status: jubilant.all_blocked(status, GRAFANA_AGENT_APP), timeout=5000)
+    juju.wait(lambda status: jubilant.all_blocked(status, GRAFANA_AGENT_APP), timeout=15*60)
     return APP_NAME
