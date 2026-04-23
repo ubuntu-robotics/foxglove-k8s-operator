@@ -26,6 +26,7 @@ from tests.integration.constants import (
     BLACKBOX_PROBES,
     GRAFANA_AGENT_APP,
     GRAFANA_AGENT_CHANNEL,
+    GRAFANA_AGENT_CHARM,
     GRAFANA_AGENT_GRAFANA_DASHBOARD,
     GRAFANA_AGENT_LOGGING_PROVIDER,
     GRAFANA_AGENT_TRACING_PROVIDER,
@@ -107,7 +108,7 @@ def app_fixture(juju: jubilant.Juju, metadata: dict[str, Any], charm_file: str) 
         resources={RESOURCE_NAME: charm_oci_image},
     )
     juju.deploy(
-        "grafana-agent-k8s",
+        GRAFANA_AGENT_CHARM,
         app=GRAFANA_AGENT_APP,
         channel=GRAFANA_AGENT_CHANNEL,
     )

@@ -10,7 +10,8 @@ METADATA = yaml.safe_load(pathlib.Path("./charmcraft.yaml").read_text(encoding="
 APP_NAME = METADATA["name"]
 RESOURCE_NAME = "foxglove-studio-image"
 
-GRAFANA_AGENT_APP = "grafana-agent-k8s"
+GRAFANA_AGENT_APP = "grafana-agent"
+GRAFANA_AGENT_CHARM = "grafana-agent-k8s"
 GRAFANA_AGENT_CHANNEL = "1/stable"
 GRAFANA_AGENT_GRAFANA_DASHBOARD = "grafana-dashboards-consumer"
 GRAFANA_AGENT_LOGGING_PROVIDER = "logging-provider"
